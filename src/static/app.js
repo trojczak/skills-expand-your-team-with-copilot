@@ -41,6 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentDay = "";
   let currentTimeRange = "";
 
+  // Track whether we've already highlighted an activity from the URL
+  let hasHighlightedFromUrl = false;
+
   // Authentication state
   let currentUser = null;
 
@@ -470,6 +473,26 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.entries(filteredActivities).forEach(([name, details]) => {
       renderActivityCard(name, details);
     });
+
+    // Scroll to and highlight an activity shared via URL (runs only once)
+    if (!hasHighlightedFromUrl) {
+      const params = new URLSearchParams(window.location.search);
+      const activityName = params.get("activity");
+      if (activityName) {
+        const cards = activitiesList.querySelectorAll(".activity-card");
+        cards.forEach((card) => {
+          const title = card.querySelector("h4");
+          if (title && title.textContent === activityName) {
+            hasHighlightedFromUrl = true;
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+            card.classList.add("activity-highlighted");
+            setTimeout(() => {
+              card.classList.remove("activity-highlighted");
+            }, 3000);
+          }
+        });
+      }
+    }
   }
 
   // Function to render a single activity card
@@ -569,6 +592,12 @@ document.addEventListener("DOMContentLoaded", () => {
         `
         }
       </div>
+      <div class="share-section">
+        <span class="share-label">Share:</span>
+        <button class="share-btn share-twitter" aria-label="Share on X (Twitter)" title="Share on X (Twitter)">𝕏</button>
+        <button class="share-btn share-facebook" aria-label="Share on Facebook" title="Share on Facebook">f</button>
+        <button class="share-btn share-copy" aria-label="Copy link" title="Copy link">🔗</button>
+      </div>
     `;
 
     // Add click handlers for delete buttons
@@ -586,6 +615,52 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    // Add share button event listeners
+    activityCard
+      .querySelector(".share-twitter")
+      .addEventListener("click", () => {
+        const shareUrl = getShareUrl(name);
+        const shareText = getShareText(name, details);
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+          "_blank",
+          "noopener,noreferrer"
+        );
+      });
+
+    activityCard
+      .querySelector(".share-facebook")
+      .addEventListener("click", () => {
+        const shareUrl = getShareUrl(name);
+        window.open(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+          "_blank",
+          "noopener,noreferrer"
+        );
+      });
+
+    const copyBtn = activityCard.querySelector(".share-copy");
+    copyBtn.addEventListener("click", () => {
+      const shareUrl = getShareUrl(name);
+      if (!navigator.clipboard) {
+        showMessage("Copying is not supported in this browser.", "error");
+        return;
+      }
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => {
+          copyBtn.textContent = "✓";
+          copyBtn.classList.add("share-copy-success");
+          setTimeout(() => {
+            copyBtn.textContent = "🔗";
+            copyBtn.classList.remove("share-copy-success");
+          }, 2000);
+        })
+        .catch(() => {
+          showMessage("Failed to copy link to clipboard.", "error");
+        });
+    });
 
     activitiesList.appendChild(activityCard);
   }
@@ -797,6 +872,21 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     );
+  }
+
+  // Generate a shareable URL for an activity
+  function getShareUrl(name) {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("activity", name);
+    return url.toString();
+  }
+
+  // Generate share text for an activity
+  function getShareText(name, details) {
+    const description = details.description || "";
+    return `Check out "${name}" at Mergington High School!${description ? " " + description : ""}`;
   }
 
   // Show message function
