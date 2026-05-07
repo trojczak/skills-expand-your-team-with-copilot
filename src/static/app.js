@@ -997,3 +997,113 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeFilters();
   fetchActivities();
 });
+
+// Git-style branch background animation
+(function () {
+  const canvas = document.getElementById("git-bg-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  // Each "branch" is a horizontal lane with commits (dots) and connecting lines
+  const LANE_COUNT = 6;
+  const COMMIT_RADIUS = 5;
+  const SPEED = 0.4; // pixels per frame
+
+  let width, height, lanes;
+
+  function getColor() {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    return isDark ? "#81c784" : "#3a8c1e";
+  }
+
+  function randomBetween(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  function initLanes() {
+    lanes = [];
+    for (let i = 0; i < LANE_COUNT; i++) {
+      const y = (height / (LANE_COUNT + 1)) * (i + 1);
+      lanes.push(createLane(y));
+    }
+  }
+
+  function createLane(y) {
+    // Build a series of commits spread across the canvas width
+    const commitCount = Math.floor(randomBetween(3, 7));
+    const commits = [];
+    let x = randomBetween(-300, 0);
+    for (let c = 0; c < commitCount; c++) {
+      x += randomBetween(120, 260);
+      commits.push({ x, y: y + randomBetween(-20, 20) });
+    }
+    return { commits, offset: 0, y };
+  }
+
+  function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    initLanes();
+  }
+
+  function drawArrow(fromX, fromY, toX, toY) {
+    const color = getColor();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    // Use a gentle bezier curve for the branch line
+    const midX = (fromX + toX) / 2;
+    ctx.bezierCurveTo(midX, fromY, midX, toY, toX, toY);
+    ctx.stroke();
+  }
+
+  function drawCommit(x, y) {
+    const color = getColor();
+    ctx.beginPath();
+    ctx.arc(x, y, COMMIT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, width, height);
+
+    for (const lane of lanes) {
+      // Move commits to the right
+      lane.offset += SPEED;
+
+      const commits = lane.commits.map((c) => ({
+        x: c.x + lane.offset,
+        y: c.y,
+      }));
+
+      // Draw lines between commits
+      for (let i = 0; i < commits.length - 1; i++) {
+        drawArrow(commits[i].x, commits[i].y, commits[i + 1].x, commits[i + 1].y);
+      }
+
+      // Draw commit dots
+      for (const c of commits) {
+        drawCommit(c.x, c.y);
+      }
+
+      // If the last commit is off screen, regenerate the lane
+      if (commits[commits.length - 1].x > width + 200) {
+        const idx = lanes.indexOf(lane);
+        lanes[idx] = createLane(lane.y);
+        lanes[idx].offset = 0;
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  animate();
+})();
